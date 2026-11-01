@@ -1,11 +1,11 @@
-# Contributing to LumeEngine
+# Contributing to StreamenEngine
 
-Thanks for your interest in LumeEngine! This guide takes you from a fresh clone to an
+Thanks for your interest in StreamenEngine! This guide takes you from a fresh clone to an
 open pull request. For the *why* behind the architecture, read
 [**PLAN.md**](PLAN.md) first — it is the authoritative design document, and most review
 feedback on this repo is a pointer into it.
 
-> **A note on content** — LumeEngine is a *player engine*. It ships with no streams and
+> **A note on content** — StreamenEngine is a *player engine*. It ships with no streams and
 > no content, and contributions must not add any. Bug reports must never contain real
 > provider credentials, playlist URLs, or stream links. If a bug only reproduces on a
 > specific stream, describe the stream's *properties* (container, codecs, bitrate, how
@@ -64,7 +64,7 @@ is not tolerated.
 
 ```bash
 git clone https://github.com/bilipp/LumeEngine.git
-cd LumeEngine
+cd StreamenEngine
 swift build
 swift test
 ```
@@ -140,7 +140,7 @@ UI belong to the consuming app (see PLAN.md §2.1).
 ## Project layout
 
 ```
-Sources/LumeEngineCore/    The engine — no UI
+Sources/StreamenEngineCore/    The engine — no UI
 ├── Demux/                 Demuxer thread, options, track/media info
 ├── Decode/                Video/audio decoders, pixel buffer factory
 ├── Subtitle/              Embedded + external subtitle decode and parsing
@@ -151,16 +151,16 @@ Sources/LumeEngineCore/    The engine — no UI
 ├── FFI/                   RAII wrappers around FFmpeg objects
 ├── Media/                 Now Playing, PiP, audio session
 └── Errors/                EngineError
-Sources/LumeEngine/        Public facade: LumePlayer, LumePlayerView
+Sources/StreamenEngine/        Public facade: StreamenPlayer, StreamenPlayerView
 build/                     FFmpeg build pipeline (manifest, scripts, patches)
 DemoApp/                   macOS demo with diagnostics HUD
-Tests/LumeEngineCoreTests/ Suite, fixtures, fault-injecting HTTP server
+Tests/StreamenEngineCoreTests/ Suite, fixtures, fault-injecting HTTP server
 ```
 
-`LumeEngineCore` uses `internal import CFFmpeg` plus library evolution so FFmpeg types
+`StreamenEngineCore` uses `internal import CFFmpeg` plus library evolution so FFmpeg types
 never leak into consumers' compiles. Keep it that way — it is what lets an app link
-LumeEngine *and* another FFmpeg-based engine without symbol or C-module collisions.
-Removing the evolution flag broke Lume within one build: it links FFmpegKit as well, and
+StreamenEngine *and* another FFmpeg-based engine without symbol or C-module collisions.
+Removing the evolution flag broke Streamen within one build: it links FFmpegKit as well, and
 Clang rejected the two conflicting `enum AVPixelFormat` definitions coming from
 `CFFmpeg` and `Libavutil`.
 
@@ -181,7 +181,7 @@ swift test --filter DecoderTests/testName      # one test
 ```
 
 Fixtures are generated lazily on the first run into `TestStreams/generated/`
-(gitignored, idempotent) by `Tests/LumeEngineCoreTests/Fixtures/generate-fixtures.sh`.
+(gitignored, idempotent) by `Tests/StreamenEngineCoreTests/Fixtures/generate-fixtures.sh`.
 
 CI runs the suite with `LIBDISPATCH_COOPERATIVE_POOL_STRICT=1`, which gives Swift
 concurrency a single cooperative thread: anything that blocks one from async code — a
@@ -249,7 +249,7 @@ The most useful report includes:
 - The stream's **properties**, never its URL: container, video/audio codecs, whether it
   is live or VOD, roughly what bitrate, and anything odd about its timestamps.
 - The **typed `PlayerEvent`s** the session emitted, and any `EngineError`.
-- Whether the demo app (`swift run LumeEngineDemo`) reproduces it — its diagnostics HUD
+- Whether the demo app (`swift run StreamenEngineDemo`) reproduces it — its diagnostics HUD
   is the fastest way to tell a demux problem from a render problem.
 - Platform, OS version, and device (hardware decode paths differ per platform).
 
@@ -259,7 +259,7 @@ Security issues go to [`SECURITY.md`](SECURITY.md), not the public tracker.
 
 ## License
 
-By contributing to LumeEngine, you agree that your contributions will be licensed under
+By contributing to StreamenEngine, you agree that your contributions will be licensed under
 the **MIT License**, the same license that covers the engine's source
 (see [`LICENSE`](LICENSE)). Changes under `build/patches/` modify FFmpeg source and are
 therefore contributed under the **LGPL 2.1+** instead — see

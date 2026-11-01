@@ -33,21 +33,21 @@ let ffmpegTarget: Target = hasLocalFFmpeg
 // `-enable-library-evolution` is load-bearing, and it can only be expressed as an
 // unsafe flag — this toolchain's SwiftSetting has no library-evolution option.
 //
-// Why it matters: with evolution, LumeEngineCore's module interface does not pull the
-// CFFmpeg C module into a consumer's compile. Without it, an app that links LumeEngine
+// Why it matters: with evolution, StreamenEngineCore's module interface does not pull the
+// CFFmpeg C module into a consumer's compile. Without it, an app that links StreamenEngine
 // *and* another FFmpeg-based engine compiles two conflicting definitions of the same C
 // types and Clang refuses:
 //
 //     'AV_PIX_FMT_OHCODEC' from module 'CFFmpeg' is not present in definition of
 //     'enum AVPixelFormat' in module 'Libavutil'
 //
-// That is precisely Lume's configuration (LumeEngine alongside KSPlayer/FFmpegKit), so
+// That is precisely Streamen's configuration (StreamenEngine alongside KSPlayer/FFmpegKit), so
 // dropping the flag broke it. Nesting the headers under lume_ffmpeg/ prevents header
 // path collisions but cannot prevent C-namespace type redefinition.
 //
 // The catch: SwiftPM rejects unsafeFlags in any package resolved as a *versioned*
 // dependency, which makes `.package(url:from:)` fail outright. So the flag is applied
-// everywhere except there — path dependencies (Lume, and engine development) keep it,
+// everywhere except there — path dependencies (Streamen, and engine development) keep it,
 // while version-resolved consumers go without.
 //
 // Consequence worth knowing: a consumer that adds this package by URL *and* links a
@@ -73,7 +73,7 @@ let ffmpegLinkerSettings: [LinkerSetting] = [
 ]
 
 let package = Package(
-    name: "LumeEngine",
+    name: "StreamenEngine",
     platforms: [
         .iOS(.v18),
         .macOS(.v15),
@@ -81,13 +81,13 @@ let package = Package(
         .visionOS(.v2),
     ],
     products: [
-        // Dynamic: FFmpeg 9 symbols stay inside LumeEngine.framework (two-level
+        // Dynamic: FFmpeg 9 symbols stay inside StreamenEngine.framework (two-level
         // namespace), so apps can also link engines embedding other FFmpeg builds
         // without symbol collisions.
-        .library(name: "LumeEngine", type: .dynamic, targets: ["LumeEngine"]),
-        // macOS triage tool: `swift run lumectl --help`. Drives a session
+        .library(name: "StreamenEngine", type: .dynamic, targets: ["StreamenEngine"]),
+        // macOS triage tool: `swift run streamenctl --help`. Drives a session
         // headlessly against a URL; nothing a consumer app links.
-        .executable(name: "lumectl", targets: ["lumectl"]),
+        .executable(name: "streamenctl", targets: ["streamenctl"]),
     ],
     targets: [
         // FFmpeg 9.0.x static libraries: released artifact, or a local build when
@@ -99,44 +99,44 @@ let package = Package(
         // out of consumers' compiles entirely — apps can link other FFmpeg-based
         // engines without C-module type collisions.
         .target(
-            name: "LumeEngineCore",
+            name: "StreamenEngineCore",
             dependencies: ["CFFmpeg"],
             swiftSettings: evolutionSettings,
             linkerSettings: ffmpegLinkerSettings
         ),
 
-        // Public facade (LumePlayer, events, SwiftUI view).
+        // Public facade (StreamenPlayer, events, SwiftUI view).
         .target(
-            name: "LumeEngine",
-            dependencies: ["LumeEngineCore"],
+            name: "StreamenEngine",
+            dependencies: ["StreamenEngineCore"],
             swiftSettings: evolutionSettings
         ),
 
-        // macOS demo app: `swift run LumeEngineDemo`.
+        // macOS demo app: `swift run StreamenEngineDemo`.
         .executableTarget(
-            name: "LumeEngineDemo",
-            dependencies: ["LumeEngine"],
+            name: "StreamenEngineDemo",
+            dependencies: ["StreamenEngine"],
             path: "DemoApp/Sources"
         ),
 
-        // lumectl's logic (argument parsing, URL redaction, the headless run,
+        // streamenctl's logic (argument parsing, URL redaction, the headless run,
         // output), kept out of the executable so the tests can reach it.
         .target(
-            name: "LumeCtlCore",
-            dependencies: ["LumeEngineCore"]
+            name: "StreamenCtlCore",
+            dependencies: ["StreamenEngineCore"]
         ),
         .executableTarget(
-            name: "lumectl",
-            dependencies: ["LumeCtlCore"]
+            name: "streamenctl",
+            dependencies: ["StreamenCtlCore"]
         ),
 
         .testTarget(
-            name: "LumeEngineCoreTests",
+            name: "StreamenEngineCoreTests",
             // CFFmpeg directly: some tests build FFmpeg structs (e.g. Dolby
             // Vision metadata) to exercise the engine's readers of them.
-            // LumeCtlCore and lumectl: the tool's tests reuse the fixtures and
+            // StreamenCtlCore and streamenctl: the tool's tests reuse the fixtures and
             // the torture server, and the Ctrl-C test runs the built binary.
-            dependencies: ["LumeEngineCore", "LumeEngine", "CFFmpeg", "LumeCtlCore", "lumectl"],
+            dependencies: ["StreamenEngineCore", "StreamenEngine", "CFFmpeg", "StreamenCtlCore", "streamenctl"],
             exclude: ["Fixtures/generate-fixtures.sh"]
         ),
     ],

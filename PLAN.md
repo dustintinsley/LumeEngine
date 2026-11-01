@@ -1,6 +1,6 @@
-# LumeEngine — Implementation Plan
+# StreamenEngine — Implementation Plan
 
-A ground-up FFmpeg-based player engine for Apple platforms (iOS, iPadOS, tvOS, macOS, visionOS), built as a standalone Swift package and integrated into Lume as its primary engine. Not a fork of any existing player — an original architecture designed for stability first, with feature parity against the most capable commercial FFmpeg players on the platform.
+A ground-up FFmpeg-based player engine for Apple platforms (iOS, iPadOS, tvOS, macOS, visionOS), built as a standalone Swift package and integrated into Streamen as its primary engine. Not a fork of any existing player — an original architecture designed for stability first, with feature parity against the most capable commercial FFmpeg players on the platform.
 
 ---
 
@@ -8,35 +8,35 @@ A ground-up FFmpeg-based player engine for Apple platforms (iOS, iPadOS, tvOS, m
 
 **Goals**
 
-1. **Stability over everything.** Every failure mode Lume works around in the third-party engines it shipped with must be impossible by design (see §3).
+1. **Stability over everything.** Every failure mode Streamen works around in the third-party engines it shipped with must be impossible by design (see §3).
 2. **Latest FFmpeg.** Pinned to FFmpeg **9.0.1** (current stable, 2026-08), with our own upgrade path — never stuck on an old fork.
 3. **Full modern feature set**: HW decode, HDR10/HLG/DV, libass subtitles, PiP, Now Playing, trickplay, live rewind, zero-delay switching, upscaling, 360°/VR, Blu-ray ISO.
-4. **Reusable**: engine code MIT/Apache-2.0, FFmpeg built in LGPL configuration, libass (ISC) — usable beyond AGPL Lume.
-5. **First-class Lume integration**: drop-in `PlayerEngineKind` case conforming to Lume's existing engine contract and `TVPlaybackEngine`.
+4. **Reusable**: engine code MIT/Apache-2.0, FFmpeg built in LGPL configuration, libass (ISC) — usable beyond AGPL Streamen.
+5. **First-class Streamen integration**: drop-in `PlayerEngineKind` case conforming to Streamen's existing engine contract and `TVPlaybackEngine`.
 
 **Non-goals (v1)**
 
 - Recording/remux to disk (explicitly deferred).
-- An opinionated full-screen UI with controls — Lume owns overlays. The package ships a bare video surface view + a demo app only.
-- AVPlayer wrapping/fallback inside the engine. Lume's engine-priority chain already handles fallback; the engine is FFmpeg-only and honest about failures.
+- An opinionated full-screen UI with controls — Streamen owns overlays. The package ships a bare video surface view + a demo app only.
+- AVPlayer wrapping/fallback inside the engine. Streamen's engine-priority chain already handles fallback; the engine is FFmpeg-only and honest about failures.
 - Encoding, transcoding, casting protocols (Chromecast).
 
-**Platform floor:** iOS/iPadOS 18, tvOS 18, macOS 15, visionOS 2 — matches Lume, unlocks Swift 6 strict concurrency, `CAMetalDisplayLink`, `AVSampleBufferVideoRenderer`, MetalFX on all targets.
+**Platform floor:** iOS/iPadOS 18, tvOS 18, macOS 15, visionOS 2 — matches Streamen, unlocks Swift 6 strict concurrency, `CAMetalDisplayLink`, `AVSampleBufferVideoRenderer`, MetalFX on all targets.
 
 ---
 
 ## 2. Requirements
 
-### 2.1 From Lume (the consumer contract)
+### 2.1 From Streamen (the consumer contract)
 
-Sources: `Lume/Views/Player/FullScreenPlayerView.swift`, `TVPlaybackEngine.swift`, `PlaybackClock.swift`, `PlaybackRetryController.swift`, `PlayableMedia.swift`.
+Sources: `Streamen/Views/Player/FullScreenPlayerView.swift`, `TVPlaybackEngine.swift`, `PlaybackClock.swift`, `PlaybackRetryController.swift`, `PlayableMedia.swift`.
 
 - **Engine view contract**: SwiftUI view constructed with `media: PlayableMedia`, `clock: PlaybackClock`, `nextUpMedia`, `skipSegments`, `reportsStartupFailure`, `usesQuickStartupTimeout`, `onPlaybackFailed`, `onSelectMedia`.
 - **Coordinator surface**: `isPlaying`, buffering state, `videoInfo (width/height/fps/codec)`, `playbackRate`, `togglePlay`, `skip(by:)`, `seek(to:)`, PiP toggle + state, audio/text track lists (`PlayerTrackOption`) + selection, startup timeout, failure callback.
 - **tvOS**: conform to `TVPlaybackEngine` (`@MainActor`, ObservableObject) so the shared Apple TV overlay drives it.
 - **Content**: IPTV — live MPEG-TS & HLS (incl. hour-long uptimes, provider hiccups, 403 token expiry), VOD MKV/MP4/TS, Xtream catch-up (seekable VOD), local downloaded files, Stalker short-lived URLs (engine must support cheap full reload with new URL).
 - **Behavioral requirements**: resume-at-position (`startTime`), reconnect via bounded backoff (engine reports errors; app schedules retries), initial-load failure reporting for the fallback chain, VOD rate menu 0.5–2.0×, fit/fill video gravity.
-- **Gaps in Lume the engine must close**: external subtitle file loading, **Now Playing / lock-screen integration** (explicit requirement — including metadata on the iPhone lock screen while content AirPlays to an Apple TV), trickplay thumbnails, chapters.
+- **Gaps in Streamen the engine must close**: external subtitle file loading, **Now Playing / lock-screen integration** (explicit requirement — including metadata on the iPhone lock screen while content AirPlays to an Apple TV), trickplay thumbnails, chapters.
 
 ### 2.2 Feature parity targets
 
@@ -53,9 +53,9 @@ Committed (per scope decision): everything in the stability core, plus:
 
 ## 3. Stability doctrine — designing out known failure modes
 
-Every item below is a failure mode documented in the FFmpeg-based engines Lume shipped before (from Lume's workarounds and a source audit), mapped to a structural countermeasure. These are **requirements**, not aspirations.
+Every item below is a failure mode documented in the FFmpeg-based engines Streamen shipped before (from Streamen's workarounds and a source audit), mapped to a structural countermeasure. These are **requirements**, not aspirations.
 
-| # | Legacy-engine failure | LumeEngine countermeasure |
+| # | Legacy-engine failure | StreamenEngine countermeasure |
 |---|---|---|
 | 1 | Use-after-free on rebuild: re-opening a running session frees `AVStream`s under live decode threads | **Session epochs.** All lifecycle ops serialized on the `PlayerSession` actor; each open gets a generation token; teardown joins data-plane threads *before* `avformat_close_input`. A new open is a new session object — old sessions can only die, never restart. |
 | 2 | MPEG-TS 33-bit PTS wraparound → frozen video after ~26.5 h | **Timestamp unwrapping at the demux boundary.** All PTS/DTS normalized to monotonic 64-bit engine time immediately after `av_read_frame`; wraparound (`TimestampUnwrapper`), discontinuities such as encoder restarts and chunk seams (`TimelineFolder`), and packets a reconnected source replays (`ReplayFilter`) handled in tested modules. Nothing downstream ever sees raw container time. |
@@ -79,8 +79,8 @@ Every item below is a failure mode documented in the FFmpeg-based engines Lume s
 
 ```
                         ┌────────────────────────── Control plane (Swift actors) ─┐
-  LumePlayer (facade)   │  PlayerSession (actor)                                  │
-  LumePlayerView (UI)   │   ├─ state machine (idle→opening→ready→playing→…)       │
+  StreamenPlayer (facade)   │  PlayerSession (actor)                                  │
+  StreamenPlayerView (UI)   │   ├─ state machine (idle→opening→ready→playing→…)       │
   Events: AsyncStream   │   ├─ session epoch/generation tokens                    │
                         │   ├─ TrackController (select audio/video/sub)           │
                         │   └─ Watchdogs (stall, sync-drift, buffer)              │
@@ -108,16 +108,16 @@ Every item below is a failure mode documented in the FFmpeg-based engines Lume s
 ### 4.2 Package layout (SPM)
 
 ```
-LumeEngine/
+StreamenEngine/
 ├── Package.swift
 ├── Sources/
-│   ├── CLumeFFmpeg/            # module maps + shims over xcframework binary targets
-│   ├── LumeEngineCore/         # no UI: session, demux, decode, clock, buffers
-│   ├── LumeEngineRender/       # SystemRenderer, MetalRenderer, shaders
-│   ├── LumeEngineSubtitles/    # libass bridge, parsers, cue model, styling
-│   ├── LumeEngineMedia/        # Now Playing, PiP, audio session, route handling
-│   ├── LumeEngine/             # public facade: LumePlayer, LumePlayerView, config, events
-│   └── LumeCtlCore/, lumectl/  # macOS triage CLI: headless session against a URL, events + diagnostics
+│   ├── CStreamenFFmpeg/            # module maps + shims over xcframework binary targets
+│   ├── StreamenEngineCore/         # no UI: session, demux, decode, clock, buffers
+│   ├── StreamenEngineRender/       # SystemRenderer, MetalRenderer, shaders
+│   ├── StreamenEngineSubtitles/    # libass bridge, parsers, cue model, styling
+│   ├── StreamenEngineMedia/        # Now Playing, PiP, audio session, route handling
+│   ├── StreamenEngine/             # public facade: StreamenPlayer, StreamenPlayerView, config, events
+│   └── StreamenCtlCore/, streamenctl/  # macOS triage CLI: headless session against a URL, events + diagnostics
 ├── BinaryDependencies/         # generated Package targets for ffmpeg/libass/dav1d xcframeworks
 ├── build/                      # FFmpeg build pipeline (scripts, patches, configs)
 ├── DemoApp/                    # multiplatform SwiftUI demo (streams menu, diagnostics HUD)
@@ -147,7 +147,7 @@ libass renders ASS/SSA (full effects, embedded fonts via attachment streams, wor
 **System caption respect:** map `MACaptionAppearance` (user's Style settings) onto text-cue styling by default.
 
 **D7 — Buffering is PTS-math, not heuristics.**
-`BufferController` computes buffered duration per track from channel PTS depth (not packet-count/fps estimates). Targets configurable (live vs VOD presets mirroring Lume's current tunables). Backpressure: demux thread parks when max buffer reached; channels never grow unbounded.
+`BufferController` computes buffered duration per track from channel PTS depth (not packet-count/fps estimates). Targets configurable (live vs VOD presets mirroring Streamen's current tunables). Backpressure: demux thread parks when max buffer reached; channels never grow unbounded.
 
 **D8 — Typed events, no delegate soup.**
 `AsyncStream<PlayerEvent>`: state changes, buffering %, first frame, track lists, decoder downgrades, stall/drift watchdog reports, network telemetry, terminal errors (`EngineError` with FFmpeg error codes + context). `@Observable PlayerObservableState` (10 Hz coalesced) for SwiftUI.
@@ -158,7 +158,7 @@ libass renders ASS/SSA (full effects, embedded fonts via attachment streams, wor
 ### 4.4 Public API sketch
 
 ```swift
-let player = LumePlayer(configuration: .init(
+let player = StreamenPlayer(configuration: .init(
     bufferPolicy: .live(target: 4, max: 30),
     hardwareDecode: .videoToolbox(fallback: .software),
     subtitles: .init(style: .systemCaptionAppearance, secondarySlot: true)
@@ -166,7 +166,7 @@ let player = LumePlayer(configuration: .init(
 try await player.open(url, options: .init(headers: [...], startTime: 132.5))
 player.play()
 for await event in player.events { ... }
-player.view          // LumePlayerView (SwiftUI) / LumePlayerLayerView (UIKit/AppKit)
+player.view          // StreamenPlayerView (SwiftUI) / StreamenPlayerLayerView (UIKit/AppKit)
 await player.select(track: audioTracks[1])
 await player.seek(to: 300, accurate: true)
 player.rate = 1.5
@@ -181,22 +181,22 @@ Modeled on mpvkit/ffmpeg-build's approach but owned by us, under `build/`:
 
 - **Pinned versions manifest** (`build/versions.json`): ffmpeg 9.0.1, dav1d, libass + freetype + harfbuzz + fribidi + libunibreak, (later: libbluray, libdvdread/nav; whisper.cpp ships as a separate SPM dep).
 - **Config: LGPL** — `--disable-gpl --disable-nonfree --disable-programs --disable-doc --disable-encoders --disable-muxers` (keep a whitelist for HLS/TS demux side), `--enable-videotoolbox --enable-audiotoolbox --enable-securetransport --enable-libdav1d --enable-network`, full decoder/demuxer/protocol set otherwise. Size budget tracked per platform (~25–35 MB/slice expected).
-- **Targets**: iOS arm64 + sim (arm64), tvOS arm64 + sim, macOS arm64 + x86_64, visionOS arm64 + sim. Static libs → per-library **xcframeworks** with clean bundle identifiers and deep macOS layout (App Store-validated — this kills Lume's `fix-ksplayer-frameworks.sh` hack).
+- **Targets**: iOS arm64 + sim (arm64), tvOS arm64 + sim, macOS arm64 + x86_64, visionOS arm64 + sim. Static libs → per-library **xcframeworks** with clean bundle identifiers and deep macOS layout (App Store-validated — this kills Streamen's `fix-ksplayer-frameworks.sh` hack).
 - **Distribution**: GitHub Actions workflow builds, checksums, and attaches artifacts to releases; `Package.swift` consumes them as `binaryTarget(url:checksum:)` with a local-path override for development. *(Implemented as of v0.1.1: the manifest points at the artifact attached to the release that built it, and prefers `BinaryDependencies/FFmpeg.xcframework` whenever that exists. The artifact URL is versioned by the FFmpeg build it contains — it moves only when `versions.json`, the configure flags, or the patches change, not on every engine release.)*
 - **Upgrade drill documented**: bump manifest → CI builds → engine test suite runs against new binaries. Staying current is a process, not a project.
 
-Licensing note: engine code is **MIT** (`LICENSE`); FFmpeg is LGPL 2.1+, and the visionOS patch under `build/patches/` is a modification of LGPL source and carries that license too. libass (ISC) joins the list when it is actually built. For AGPL Lume this is trivially fine; for other consumers the LGPL §6 obligations, and why dynamic linking plus a reproducible in-repo FFmpeg build satisfies relinkability, are documented in `THIRD-PARTY-NOTICES.md`.
+Licensing note: engine code is **MIT** (`LICENSE`); FFmpeg is LGPL 2.1+, and the visionOS patch under `build/patches/` is a modification of LGPL source and carries that license too. libass (ISC) joins the list when it is actually built. For AGPL Streamen this is trivially fine; for other consumers the LGPL §6 obligations, and why dynamic linking plus a reproducible in-repo FFmpeg build satisfies relinkability, are documented in `THIRD-PARTY-NOTICES.md`.
 
 ---
 
 ## 6. Feature implementation notes (selected)
 
-- **Now Playing (explicit requirement):** `NowPlayingCenter` module in `LumeEngineMedia` — `MPNowPlayingInfoCenter` (title/artwork/elapsed/duration/rate, live-stream flag) + `MPRemoteCommandCenter` (play/pause/seek/skip/next-episode hook), audio-session lifecycle, route-change and interruption handling. Works on the lock screen/Control Center including while audio/video routes to an Apple TV. Note: full-screen *video* AirPlay of FFmpeg-decoded content is not possible for third parties (system limitation); Lume's existing switch-to-AVPlayer-on-AirPlay stays, and the integration phase adds a shared app-level Now Playing service so lock-screen metadata is present in **both** engines (closing today's gap).
+- **Now Playing (explicit requirement):** `NowPlayingCenter` module in `StreamenEngineMedia` — `MPNowPlayingInfoCenter` (title/artwork/elapsed/duration/rate, live-stream flag) + `MPRemoteCommandCenter` (play/pause/seek/skip/next-episode hook), audio-session lifecycle, route-change and interruption handling. Works on the lock screen/Control Center including while audio/video routes to an Apple TV. Note: full-screen *video* AirPlay of FFmpeg-decoded content is not possible for third parties (system limitation); Streamen's existing switch-to-AVPlayer-on-AirPlay stays, and the integration phase adds a shared app-level Now Playing service so lock-screen metadata is present in **both** engines (closing today's gap).
 - **Audio width follows the route:** decoded audio leaves the engine in the layout `AudioLayoutPolicy` picks for the *negotiated* route width (`AVAudioSession.outputNumberOfChannels`, followed through route changes by `AudioOutputRoute`; stereo on macOS): discrete multichannel when the route carries it (HDMI receiver), an explicit ITU-R BS.775 fold-down (`DownmixMatrix`: centre and surrounds at −3 dB, LFE omitted, not normalized) when it does not, mono on both speakers of a stereo route. A route change refits at the next decoded frame; audio decoded for a wider route never reaches a narrower one. The engine observes the audio session only — category, activation and the preferred channel count are the host's. `PlayerSession.audioHealth` reports audio that died while video plays on (decoder gave up, renderer failed, or nothing reaching the renderer at a running playhead).
 - **PiP:** `AVPictureInPictureController(contentSource: .init(sampleBufferDisplayLayer:playbackDelegate:))` from the SystemRenderer; subtitle cues composited into the sample buffers during PiP so subs survive.
 - **Trickplay:** a `ThumbnailSession` — separate lightweight demux+decode (keyframes only, HW decode, downscale to ~320 px) filling a time-indexed cache; API `thumbnails(at:interval:)`. Works for VOD/catch-up; live uses the rewind buffer.
 - **Live rewind (time-shift DVR):** disk-backed packet spool behind a custom AVIO layer; seeking within spool = local demux, seeking to live edge = passthrough. Configurable size/duration caps.
-- **Zero-delay switching:** `prepare(next:)` opens a second session through first-frame-decoded, then atomically swaps renderer attachment; old session torn down async. (Also powers Lume's next-episode auto-advance and channel zapping.)
+- **Zero-delay switching:** `prepare(next:)` opens a second session through first-frame-decoded, then atomically swaps renderer attachment; old session torn down async. (Also powers Streamen's next-episode auto-advance and channel zapping.)
 - **Precache:** same AVIO disk-cache layer, `precache(url:leadingSeconds:)` background task with LRU budget.
 - **Upscaling:** MetalFX spatial scaler stage (D5), quality/perf switch, auto-disable on thermal pressure (`ProcessInfo.thermalState`).
 - **HDR:** HDR10/HLG passthrough via sample-buffer attachments. DV with an HDR10-compatible base layer (P8.1, P10.1, …) plays as HDR10. DV with an IPTPQc2 base layer (P5, P10.0, P20 — compatibility ID 0) is converted to HDR10 before enqueue by a Metal compute pass (`Decode/DolbyVisionConverter`) that applies each frame's RPU reshaping (polynomial + MMR) and the IPT→LMS→BT.2020 matrices FFmpeg exports as `AV_FRAME_DATA_DOVI_METADATA`; the renderer then tone-maps it like any HDR10 stream. Dynamic DV display management (L1/L2/L8 trims) is not carried over. HDR10 static metadata (mastering display, MaxCLL/MaxFALL — from the bitstream's SEI or the container, falling back to a DV RPU's level 6 for the light level) is attached to every delivered pixel buffer, since neither VideoToolbox nor the engine's own buffers carry it otherwise, and so reaches the format description; HDR10+ dynamic metadata travels per sample as `kCMSampleAttachmentKey_HDR10PlusPerFrameData` (`Decode/HDRMetadata`). Whether the renderer acts on HDR10+ for decoded (not compressed) samples is still to be confirmed on an HDR10+ display. EDR headroom handling on macOS/visionOS Metal path.
@@ -204,7 +204,7 @@ Licensing note: engine code is **MIT** (`LICENSE`); FFmpeg is LGPL 2.1+, and the
 - **360°/VR:** MetalRenderer projection (equirect sphere / fisheye), CoreMotion + gesture camera; visionOS immersive presentation later.
 - **Blu-ray ISO/DVD:** libbluray/libdvdnav behind the `AVIOProtocol` seam; menu-less title playback first (longest-title heuristic), chapters mapped to the chapter API.
 - **AI subtitles:** whisper.cpp (Metal) tapping the decoded-audio channel; streaming word-level segments feed the subtitle model as a synthetic track; on-device translation via Translation.framework.
-- **Chapters:** read from container (`AVChapter`) + exposed in API (feeds Lume's skip-intro as a second source).
+- **Chapters:** read from container (`AVChapter`) + exposed in API (feeds Streamen's skip-intro as a second source).
 
 ---
 
@@ -240,18 +240,18 @@ In the legacy engines, the crash-prone areas are exactly the untested ones. Inve
 
 ## 9. Roadmap
 
-Phases are sequential milestones; each ends demoable in the DemoApp. (P0–P4 are the critical path to "plays video well"; P5–P7 reach Lume-integration quality; P8 ships it; P9+ are the differentiators.)
+Phases are sequential milestones; each ends demoable in the DemoApp. (P0–P4 are the critical path to "plays video well"; P5–P7 reach Streamen-integration quality; P8 ships it; P9+ are the differentiators.)
 
 - **P0 — Foundations:** repo scaffolding, FFmpeg build pipeline for all 5 platform slices, SPM binary targets, CI (build + TSan + fixtures), DemoApp shell. *Exit: `avformat_version()` callable from the demo app on every platform.*
 - **P1 — Demux core:** RAII wrappers, channels, Demuxer thread (open/read/seek/interrupt), timestamp unwrapper, typed errors, track model, chapters. *Exit: packet-level inspection of MKV/TS/HLS in demo; wraparound unit tests green.*
 - **P2 — Decode:** video decode with single VT hwaccel path + SW fallback policy, audio decode + swresample negotiation, supervisor + downgrade events. *Exit: decoded-frame dumps correct for the whole fixture matrix.*
 - **P3 — Render & sync:** SystemRenderer (synchronizer + audio/video renderers), session state machine, play/pause/seek(accurate & fast)/rate, buffer controller, first-frame fast path, fit/fill. **Early DV P5/P8 spike here.** *Exit: smooth playback incl. HDR fixtures; seek storm test green.*
-- **P4 — Facade & UI:** `LumePlayer` API, events stream, `LumePlayerView`, DemoApp with diagnostics HUD (buffer depth, clocks, decoder path, drops). *Exit: public API frozen for v1.*
+- **P4 — Facade & UI:** `StreamenPlayer` API, events stream, `StreamenPlayerView`, DemoApp with diagnostics HUD (buffer depth, clocks, decoder path, drops). *Exit: public API frozen for v1.*
 - **P5 — Tracks & subtitles:** runtime track switching, libass integration, bitmap subs, external files, dual slots, system caption appearance, subtitle delay/position controls.
 - **P6 — Resilience:** watchdogs (stall, sync drift), reconnect semantics for live, torture-server suite, 24 h soak gate, memory/leak gates.
 - **P7 — Platform integration:** PiP (with subtitles), Now Playing + remote commands + audio session/route handling, background audio behavior, tvOS focus/idle specifics, visionOS window presentation.
-- **P8 — Lume integration:** new `PlayerEngineKind.lumeEngine`, engine view + coordinator conforming to Lume's contract + `TVPlaybackEngine`, shared app-level Now Playing service (covers the AVPlayer/AirPlay path too), external-subtitle UI, A/B via engine priority setting. Ships as an opt-in beta engine appended to the priority list; promotion to default follows once the beta bakes. *Exit: Lume builds run LumeEngine alongside the existing engines with the fallback chain intact.*
-- **P9 — Premium UX:** trickplay thumbnails, zero-delay switching (wired to Lume next-episode & channel zapping), live rewind spool, precache API.
+- **P8 — Streamen integration:** new `PlayerEngineKind.streamenEngine`, engine view + coordinator conforming to Streamen's contract + `TVPlaybackEngine`, shared app-level Now Playing service (covers the AVPlayer/AirPlay path too), external-subtitle UI, A/B via engine priority setting. Ships as an opt-in beta engine appended to the priority list; promotion to default follows once the beta bakes. *Exit: Streamen builds run StreamenEngine alongside the existing engines with the fallback chain intact.*
+- **P9 — Premium UX:** trickplay thumbnails, zero-delay switching (wired to Streamen next-episode & channel zapping), live rewind spool, precache API.
 - **P10 — Visual pack:** GPU pre-processing stage (adjustments), MetalFX upscaling, HDR10+ metadata, MetalRenderer completion, HDR subtitles.
 - **P11 — Exotic:** 360°/VR, Blu-ray ISO/DVD, whisper.cpp AI subtitles + translation, AC-4/passthrough investigation results.
 
@@ -261,8 +261,8 @@ Phases are sequential milestones; each ends demoable in the DemoApp. (P0–P4 ar
 
 ## 10. Success criteria
 
-1. Lume runs LumeEngine as default engine with **fewer than 10 % of sessions** ever touching the fallback chain.
+1. Streamen runs StreamenEngine as default engine with **fewer than 10 % of sessions** ever touching the fallback chain.
 2. Zero engine-attributed crashes in a full TestFlight cycle; 24 h live-TS soak with no stall/drift.
-3. All of Lume's legacy-engine workarounds (stream-rebuild hacks, clock-drift and stall watchdogs, stale-state guards, framework-fixing script) become unnecessary for LumeEngine playback.
+3. All of Streamen's legacy-engine workarounds (stream-rebuild hacks, clock-drift and stall watchdogs, stale-state guards, framework-fixing script) become unnecessary for StreamenEngine playback.
 4. Feature checklist §2.2 core + premium demonstrably working in DemoApp on all five platforms.
 5. FFmpeg upgrade 8.1.x → next stable executed once via the documented drill in < 1 day of work. *(Met 2026-09-15: 8.1.2 → 9.0.1 — manifest bump, patch re-verified against the new tree, zero engine source changes, suite green.)*

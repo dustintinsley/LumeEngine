@@ -1,6 +1,6 @@
-# LumeEngine
+# StreamenEngine
 
-An FFmpeg 9-based media player engine for Apple platforms, designed from scratch for stability on long-running IPTV streams. Built for [Lume](https://github.com/bilipp/Lume).
+An FFmpeg 9-based media player engine for Apple platforms, designed from scratch for stability on long-running IPTV streams. Built for [Streamen](https://github.com/bilipp/Lume).
 
 [![CI](https://github.com/bilipp/LumeEngine/actions/workflows/ci.yml/badge.svg)](https://github.com/bilipp/LumeEngine/actions/workflows/ci.yml)
 [![Platforms](https://img.shields.io/badge/platforms-iOS%2018%20·%20tvOS%2018%20·%20macOS%2015%20·%20visionOS%202-1f1f2e?labelColor=1f1f2e)](#installation)
@@ -8,7 +8,7 @@ An FFmpeg 9-based media player engine for Apple platforms, designed from scratch
 [![FFmpeg](https://img.shields.io/badge/FFmpeg-9.0.1%20LGPL-007808?labelColor=1f1f2e)](THIRD-PARTY-NOTICES.md)
 [![License](https://img.shields.io/badge/license-MIT-blue?labelColor=1f1f2e)](LICENSE)
 
-> **Status: pre-1.0, beta.** The engine plays real IPTV content and ships as an opt-in beta engine in Lume, but the public API is not yet frozen — expect breaking changes between 0.x releases.
+> **Status: pre-1.0, beta.** The engine plays real IPTV content and ships as an opt-in beta engine in Streamen, but the public API is not yet frozen — expect breaking changes between 0.x releases.
 
 An original architecture, not a fork of an existing player. See [PLAN.md](PLAN.md) for the full design document, including the catalog of legacy-engine failure modes this engine makes structurally impossible (§3), the architecture decisions (§4), and the roadmap (§9).
 
@@ -35,14 +35,14 @@ dependencies: [
     .package(url: "https://github.com/bilipp/LumeEngine.git", from: "0.1.3")
 ],
 targets: [
-    .target(name: "YourApp", dependencies: ["LumeEngine"])
+    .target(name: "YourApp", dependencies: ["StreamenEngine"])
 ]
 ```
 
 Or in Xcode: **File ▸ Add Package Dependencies…**, paste
-`https://github.com/bilipp/LumeEngine.git`, and add the `LumeEngine` library to your
+`https://github.com/bilipp/LumeEngine.git`, and add the `StreamenEngine` library to your
 app target. Xcode embeds and signs it for you; if you wire it up by hand, make sure
-`LumeEngine` is in **Embed Frameworks** with *Embed & Sign* — the product is a dynamic
+`StreamenEngine` is in **Embed Frameworks** with *Embed & Sign* — the product is a dynamic
 library ([on purpose](#license)).
 
 **You do not need the FFmpeg build pipeline to consume the package.** SwiftPM downloads
@@ -55,24 +55,24 @@ working on the engine itself, or want to build FFmpeg differently — see
 Requires Xcode 26+, and iOS 18+ / tvOS 18+ / macOS 15+ / visionOS 2+.
 
 > **If your app also links another FFmpeg-based player** (KSPlayer/FFmpegKit, VLCKit, …),
-> add LumeEngine as a **path or submodule dependency** rather than by URL. The engine
+> add StreamenEngine as a **path or submodule dependency** rather than by URL. The engine
 > normally builds with library evolution, which keeps its FFmpeg C module out of your
 > compile — but SwiftPM forbids the flag that enables it in version-resolved
 > dependencies, so a URL dependency drops it and your build hits conflicting definitions
 > of FFmpeg's C types (`enum AVPixelFormat` from `CFFmpeg` vs `Libavutil`). A path
-> dependency keeps evolution on and compiles cleanly. This is how Lume itself integrates.
+> dependency keeps evolution on and compiles cleanly. This is how Streamen itself integrates.
 
 ## Usage
 
 ```swift
-import LumeEngine
+import StreamenEngine
 
-let player = LumePlayer()                    // @MainActor @Observable
+let player = StreamenPlayer()                    // @MainActor @Observable
 try await player.load(url: "https://example.com/stream.m3u8")
 player.play()
 
 // SwiftUI
-LumePlayerView(player: player)
+StreamenPlayerView(player: player)
 
 // Lower-level control plane
 let session = PlayerSession(configuration: .init())
@@ -96,32 +96,32 @@ build/scripts/make-xcframework.sh                # -> BinaryDependencies/FFmpeg.
 
 swift build
 swift test          # 64 tests: unit, fixture-based decode, playback, torture server
-swift run LumeEngineDemo                         # macOS demo with diagnostics HUD
+swift run StreamenEngineDemo                         # macOS demo with diagnostics HUD
 ```
 
 Testing needs a host `ffmpeg` CLI (`brew install ffmpeg`) to generate fixtures on first run — a build-time tool, unrelated to the FFmpeg the engine links. The full 10-slice matrix (`build/scripts/platforms.sh`) is only needed for release binaries, which CI builds on tags.
 
-## Debugging streams with lumectl
+## Debugging streams with streamenctl
 
-`lumectl` (macOS) plays a URL headlessly through the engine and prints what it reports, so a stream problem — a slow start, stalls, a reconnect that replays media, timestamp seams, a hardware decoder falling back, an HTTP error — can be reproduced from a terminal without the app:
+`streamenctl` (macOS) plays a URL headlessly through the engine and prints what it reports, so a stream problem — a slow start, stalls, a reconnect that replays media, timestamp seams, a hardware decoder falling back, an HTTP error — can be reproduced from a terminal without the app:
 
 ```bash
-swift run lumectl probe 'http://provider.example:8080/live/user/pass/1234.ts'
-swift run lumectl play  'http://provider.example:8080/live/user/pass/1234.ts' --duration 60
-swift run lumectl play  stream.m3u8 --json --record-events run.jsonl --interval 1
+swift run streamenctl probe 'http://provider.example:8080/live/user/pass/1234.ts'
+swift run streamenctl play  'http://provider.example:8080/live/user/pass/1234.ts' --duration 60
+swift run streamenctl play  stream.m3u8 --json --record-events run.jsonl --interval 1
 ```
 
 `probe` prints the container, duration, start time, live/seekable flags and every track (codec, language, resolution, frame rate, bit depth, HDR transfer and colour tags). `play` runs a muted session and prints every `PlayerEvent` with a timestamp, a diagnostics heartbeat (queue depths, renderer health, delivery rate, timeline seams, replayed packets), the startup timeline once the first frame shows, the stalled stage on every stall, and the typed error — with its HTTP status class — on failure. `--json` switches stdout to JSON Lines; `--record-events FILE` keeps a JSON Lines copy next to the readable output.
 
 The exit status tells the outcome apart for scripted repro loops: `0` ok, `3` the source never opened, `4` playback failed, `5` stalled (without failing), `2` bad arguments. Ctrl-C ends a run cleanly with a summary.
 
-URLs are printed as scheme and host only (`http://provider.example:8080/[redacted].ts`), because IPTV URLs carry the account; header values are never printed. Pass `--show-urls` to see them in full. `lumectl --help` lists every option: start position, mid-stream seek, software decoding, preferred audio languages, a single lane, custom headers, user agent, referer, reconnect and timeouts.
+URLs are printed as scheme and host only (`http://provider.example:8080/[redacted].ts`), because IPTV URLs carry the account; header values are never printed. Pass `--show-urls` to see them in full. `streamenctl --help` lists every option: start position, mid-stream seek, software decoding, preferred audio languages, a single lane, custom headers, user agent, referer, reconnect and timeouts.
 
 ## Layout
 
-- `Sources/LumeEngineCore` — demux, decode, render, session, subtitles, media integration (no UI)
-- `Sources/LumeEngine` — public facade: `LumePlayer`, `LumePlayerView`
-- `Sources/lumectl`, `Sources/LumeCtlCore` — the `lumectl` command-line tool
+- `Sources/StreamenEngineCore` — demux, decode, render, session, subtitles, media integration (no UI)
+- `Sources/StreamenEngine` — public facade: `StreamenPlayer`, `StreamenPlayerView`
+- `Sources/streamenctl`, `Sources/StreamenCtlCore` — the `streamenctl` command-line tool
 - `build/` — FFmpeg build pipeline (versions manifest, scripts, patches)
 - `DemoApp/` — macOS demo with diagnostics HUD
 - `Tests/` — including a fault-injecting HTTP torture server
@@ -136,4 +136,4 @@ Security issues: see [SECURITY.md](SECURITY.md) — please don't open a public i
 
 Engine source: **MIT** — see [LICENSE](LICENSE).
 
-LumeEngine links **FFmpeg** under the **LGPL 2.1+**, and ships one patch to FFmpeg source under that same license. If you distribute an app built on this engine, [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) tells you exactly what that obliges you to do — and how this repository is arranged to keep it straightforward. The build is verifiably LGPL, not GPL (`--disable-gpl --disable-nonfree`), and the `LumeEngine` product is dynamic so FFmpeg stays relinkable.
+StreamenEngine links **FFmpeg** under the **LGPL 2.1+**, and ships one patch to FFmpeg source under that same license. If you distribute an app built on this engine, [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) tells you exactly what that obliges you to do — and how this repository is arranged to keep it straightforward. The build is verifiably LGPL, not GPL (`--disable-gpl --disable-nonfree`), and the `StreamenEngine` product is dynamic so FFmpeg stays relinkable.

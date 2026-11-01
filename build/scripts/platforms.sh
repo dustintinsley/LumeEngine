@@ -1,5 +1,5 @@
 #!/bin/bash
-# Platform definitions for LumeEngine binary builds.
+# Platform definitions for StreamenEngine binary builds.
 # Each platform maps to: SDK name, clang -target triple, FFmpeg arch.
 #
 # Usage: source platforms.sh; platform_env <platform-id>

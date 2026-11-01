@@ -1,4 +1,4 @@
-// Umbrella header for the CFFmpeg module (LumeEngine binary distribution).
+// Umbrella header for the CFFmpeg module (StreamenEngine binary distribution).
 #ifndef CFFMPEG_UMBRELLA_H
 #define CFFMPEG_UMBRELLA_H
 
