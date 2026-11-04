@@ -3,14 +3,14 @@ import SwiftUI
 // The demo is a macOS-only tool; the package's library products build for
 // every platform and the demo must not block them (CI/simulator test runs).
 #if os(macOS)
-import LumeEngine
+import StreamenEngine
 
 /// Minimal engine demo (macOS): URL bar, transport controls, diagnostics HUD.
-/// Run with `swift run LumeEngineDemo` from the repo root.
+/// Run with `swift run StreamenEngineDemo` from the repo root.
 @main
-struct LumeEngineDemoApp: App {
+struct StreamenEngineDemoApp: App {
     var body: some Scene {
-        WindowGroup("LumeEngine Demo") {
+        WindowGroup("StreamenEngine Demo") {
             DemoView()
                 .frame(minWidth: 900, minHeight: 560)
         }
@@ -18,13 +18,13 @@ struct LumeEngineDemoApp: App {
 }
 
 struct DemoView: View {
-    @State private var player = LumePlayer()
+    @State private var player = StreamenPlayer()
     @State private var urlText = defaultFixtureURL()
     @State private var statusMessage = ""
 
     var body: some View {
         VStack(spacing: 0) {
-            LumePlayerView(player: player)
+            StreamenPlayerView(player: player)
                 .background(Color.black)
                 .overlay(alignment: .topLeading) { hud }
 
@@ -115,9 +115,9 @@ struct DemoView: View {
 }
 #else
 @main
-struct LumeEngineDemoApp {
+struct StreamenEngineDemoApp {
     static func main() {
-        fatalError("LumeEngineDemo is macOS-only")
+        fatalError("StreamenEngineDemo is macOS-only")
     }
 }
 #endif

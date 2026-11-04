@@ -1,5 +1,5 @@
 <!--
-Thanks for contributing to LumeEngine! Please read CONTRIBUTING.md if you haven't yet.
+Thanks for contributing to StreamenEngine! Please read CONTRIBUTING.md if you haven't yet.
 Keep PRs focused and single-purpose. Fill out the sections below.
 -->
 

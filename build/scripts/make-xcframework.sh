@@ -15,13 +15,13 @@ rm -rf "$STAGE" && mkdir -p "$STAGE"
 
 stage_slice() { # stage_slice <name> <libdir> <includedir>
     local slice="$STAGE/$1"
-    # FFmpeg headers are nested under lume_ffmpeg/ and their includes rewritten,
+    # FFmpeg headers are nested under streamen_ffmpeg/ and their includes rewritten,
     # so they can NEVER collide with another package shipping libav* headers at
     # the conventional paths (e.g. another engine embedding a different FFmpeg).
-    mkdir -p "$slice/Headers/lume_ffmpeg"
+    mkdir -p "$slice/Headers/streamen_ffmpeg"
     libtool -static -o "$slice/libffmpeg.a" "$2"/lib*.a 2> >(grep -v 'has no symbols' >&2 || true)
-    cp -R "$3/" "$slice/Headers/lume_ffmpeg/"
-    python3 - "$slice/Headers/lume_ffmpeg" <<'PYEOF'
+    cp -R "$3/" "$slice/Headers/streamen_ffmpeg/"
+    python3 - "$slice/Headers/streamen_ffmpeg" <<'PYEOF'
 import os, re, sys
 root = sys.argv[1]
 pattern = re.compile(r'#\s*include\s*(["<])(libav(?:util|codec|format|filter|device)|libsw(?:scale|resample))/')
@@ -32,7 +32,7 @@ for dirpath, _, files in os.walk(root):
         path = os.path.join(dirpath, name)
         with open(path) as fh:
             text = fh.read()
-        rewritten = pattern.sub(lambda m: f'#include {m.group(1)}lume_ffmpeg/{m.group(2)}/', text)
+        rewritten = pattern.sub(lambda m: f'#include {m.group(1)}streamen_ffmpeg/{m.group(2)}/', text)
         if rewritten != text:
             with open(path, 'w') as fh:
                 fh.write(rewritten)
@@ -40,8 +40,8 @@ PYEOF
     # The module map lives in Headers/CFFmpeg/, not at the Headers root: Xcode
     # copies every static xcframework's Headers/ into one Products/<config>/include/,
     # so a root module.modulemap collides with any other package that ships one
-    # (LibDovi, via AetherEngine in Lume). lume_ffmpeg/ stays at the root, where
-    # CFFmpeg.h's <lume_ffmpeg/...> includes resolve against the Headers search path.
+    # (LibDovi, via AetherEngine in Streamen). streamen_ffmpeg/ stays at the root, where
+    # CFFmpeg.h's <streamen_ffmpeg/...> includes resolve against the Headers search path.
     mkdir -p "$slice/Headers/CFFmpeg"
     cp "$BUILD_DIR/support/CFFmpeg.h" "$slice/Headers/CFFmpeg/"
     cp "$BUILD_DIR/support/CFFmpegShim.h" "$slice/Headers/CFFmpeg/"

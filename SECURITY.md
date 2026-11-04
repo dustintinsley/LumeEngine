@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-If you discover a security vulnerability in LumeEngine, please report it **privately** —
+If you discover a security vulnerability in StreamenEngine, please report it **privately** —
 do not open a public issue, pull request, or discussion, as that may put users of
 downstream apps at risk before a fix is available.
 
@@ -26,11 +26,11 @@ issue is resolved, unless you prefer to remain anonymous.
 
 ## Scope
 
-LumeEngine is a **client-side media engine**. It ships no servers, no bundled streams,
+StreamenEngine is a **client-side media engine**. It ships no servers, no bundled streams,
 and no backend. It does, however, parse hostile input by design: an IPTV stream is
 attacker-controlled data fed straight into demuxers and decoders. Relevant areas:
 
-- Memory safety in the FFI layer (`Sources/LumeEngineCore/FFI/`) — lifetime handling of
+- Memory safety in the FFI layer (`Sources/StreamenEngineCore/FFI/`) — lifetime handling of
   `AVPacket`/`AVFrame`, and anything that could survive a session teardown
 - Demux/decode handling of malformed, truncated, or adversarial containers and codecs
 - The bounded channels and thread supervision (a remotely triggerable hang, deadlock, or
@@ -49,5 +49,5 @@ to connect to.
 
 ## Supported versions
 
-LumeEngine is actively developed and pre-1.0. Security fixes target `main` and the
+StreamenEngine is actively developed and pre-1.0. Security fixes target `main` and the
 latest release. Please confirm you are on the most recent commit before reporting.

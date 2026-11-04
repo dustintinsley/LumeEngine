@@ -48,7 +48,7 @@ jobs:
       # which the strict pool below would turn into the whole suite stalling
       # behind it. Idempotent, so the tests' own call is then a no-op.
       - name: Generate test fixtures
-        run: bash Tests/LumeEngineCoreTests/Fixtures/generate-fixtures.sh TestStreams/generated
+        run: bash Tests/StreamenEngineCoreTests/Fixtures/generate-fixtures.sh TestStreams/generated
 
       - name: Run tests
         # One cooperative thread for all of Swift concurrency. Code that blocks
@@ -125,11 +125,11 @@ jobs:
       - name: Package xcframework
         run: build/scripts/make-xcframework.sh
 
-      - name: Build LumeEngine for ${{ matrix.platform }}
+      - name: Build StreamenEngine for ${{ matrix.platform }}
         run: |
           set -euo pipefail   # without this, piping to tail would swallow build failures
           xcodebuild build \
-            -scheme LumeEngine \
+            -scheme StreamenEngine \
             -destination '${{ matrix.destination }}' \
             | tail -20
 
