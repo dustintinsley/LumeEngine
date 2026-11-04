@@ -55,6 +55,15 @@ public final class StreamenPlayer {
     /// layer tree directly (UIKit/AppKit).
     public var displayLayer: StreamenDisplayLayer? { session?.renderer.displayLayer }
 
+    /// The current session's colour sampler (see `VideoSampleTap`); nil with
+    /// nothing loaded. Each `load` starts a new one, enabled only when the
+    /// configuration's `videoSampling` is set.
+    public var videoSamples: VideoSampleTap? { session?.renderer.videoSamples }
+
+    /// The sample of the frame on screen now; nil while sampling is off.
+    /// Main actor — prefer `videoSamples` for anything per frame.
+    public var currentVideoSample: VideoSampleTap.Sample? { session?.currentVideoSample() }
+
     /// tvOS: switch the TV to each loaded stream's refresh rate and dynamic
     /// range (Match Content) while it plays in a `StreamenPlayerView`, which
     /// supplies the window; `stop()` and the view going away hand the display
